@@ -1,0 +1,5 @@
+*.sif
+Data/*
+*.code-workspace
+*.h5
+*.pt

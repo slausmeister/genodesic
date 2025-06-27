@@ -1,0 +1,31 @@
+# base.def: A reusable base image with CUDA and Mamba, installed via Miniconda
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-devel-ubuntu22.04
+
+%help
+    Base container with Mamba and CUDA 12.4.
+    Mamba is installed via Miniconda for maximum reliability.
+    Use this image to launch development environments.
+
+%post
+    # 1. Install system dependencies
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends wget bzip2 ca-certificates \
+    && find /var/lib/apt/lists -mindepth 1 -delete
+
+    # 2. Install the official Miniconda installer
+    wget "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" -O /tmp/miniconda.sh
+    bash /tmp/miniconda.sh -b -p /opt/conda
+    rm /tmp/miniconda.sh
+    export PATH="/opt/conda/bin:${PATH}"
+
+    # 3. Use conda to install mamba from the reliable conda-forge channel
+    # This is more robust than downloading Mambaforge directly.
+    conda install -n base -c conda-forge mamba -y 
+
+    # 4. Clean up conda packages to reduce image size
+    conda clean -afy
+
+%environment
+    # Add Conda/Mamba to the path
+    export PATH="/opt/conda/bin:${PATH}"
