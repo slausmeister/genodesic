@@ -1,0 +1,52 @@
+Bootstrap: docker
+From: nvidia/cuda:12.1.1-devel-ubuntu22.04
+
+%files
+    # Copy the environment file from the host into /opt inside the container.
+    environment.yml /opt/environment.yml
+
+%post
+    # Install some essential OS packages
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y wget bzip2 ca-certificates
+
+    # --- THIS IS THE CORRECTED LINE ---
+    # Download the Miniforge3 installer (which includes Mamba)
+    wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" -O /tmp/mamba.sh
+    
+    # Install Mambaforge silently.
+    bash /tmp/mamba.sh -b -p /opt/conda
+
+    # IMPORTANT: Use the mamba installation we just created.
+    export PATH="/opt/conda/bin:$PATH"
+
+    # Now, create the entire environment from the YAML file in one go.
+    mamba env create -f /opt/environment.yml
+
+    # Clean up to reduce image size
+    mamba clean -afy
+    rm /tmp/mamba.sh
+
+%environment
+    # Set the default environment to be the one we just created with mamba
+    export PATH="/opt/conda/envs/genodesic/bin:$PATH"
+    export CONDA_PREFIX="/opt/conda/envs/genodesic"
+
+    # Make matplotlib etc. use container cache instead of referring to .local of host user
+    export XDG_CONFIG_HOME=$(mktemp -d)
+    export XDG_CACHE_HOME=$(mktemp -d)
+    export XDG_DATA_HOME=$(mktemp -d)
+    
+    # Isolate python from the host user's site-packages
+    export PYTHONNOUSERSITE=1
+
+%runscript
+    # This script runs when you execute `./genodesic.sif`
+    # It activates the conda environment and then awaits your commands
+    exec /bin/bash --rcfile <(echo "source /opt/conda/bin/activate genodesic") "$@"
+
+%help
+    Container for the 'genodesic' project.
+    Includes PyTorch, RAPIDS (cuML), and Scanpy for single-cell analysis.
+    Based on CUDA 12.1.

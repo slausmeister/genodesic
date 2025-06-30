@@ -4,7 +4,6 @@ import os
 import argparse
 from tqdm import tqdm
 
-
 # We assume the Genodesic package is installed or in the PYTHONPATH
 # This allows us to import our custom modules
 from Genodesic.Dataloaders.CountLoader import create_count_dataloaders
@@ -24,6 +23,11 @@ def setup_arg_parser():
         "--model_save_path",
         required=True,
         help="Path to save the final trained model checkpoint."
+    )
+    parser.add_argument(
+        "--latent_save_path",
+        default=None,
+        help="Optional path to save the final latent space embedding and timepoints."
     )
     parser.add_argument(
         "--latent_dims",
@@ -62,8 +66,6 @@ def setup_arg_parser():
         default=0.3,
         help="Overdispersion parameter alpha for the NB loss."
     )
-    # Note: We are assuming a non-variational autoencoder for now, as in the notebook.
-    # A '--variational' flag could be added here if needed.
     return parser
 
 def main(args):
@@ -73,18 +75,17 @@ def main(args):
     # 1. Setup device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
+    print(f"Overdispersion parameter alpha: {args.overdispersion}")
 
     # 2. Create DataLoaders
-    # The dataloader needs to know the device to pre-load tensors
     loaders = create_count_dataloaders(args.tensor_file, args.batch_size, args.val_split, shuffle=True, device=device)
     if args.val_split > 0:
         train_loader, val_loader = loaders
     else:
         train_loader = loaders
-        val_loader = None # No validation loader
+        val_loader = None
 
     # 3. Initialize Model and Optimizer
-    # Determine input dimension from the first batch of data
     first_batch_data, _ = next(iter(train_loader))
     input_dim = first_batch_data.shape[1]
     print(f"Detected input dimension (number of HVGs): {input_dim}")
@@ -101,7 +102,6 @@ def main(args):
     print("\n--- Starting Training ---")
     # 4. Training Loop
     for epoch in range(1, args.num_epochs + 1):
-        # Training phase
         model.train()
         train_loss = 0.0
         for batch_data, _ in tqdm(train_loader, desc=f"Epoch {epoch} [Train]", leave=False):
@@ -115,7 +115,6 @@ def main(args):
         avg_train_loss = train_loss / len(train_loader)
         train_losses.append(avg_train_loss)
 
-        # Validation phase
         avg_val_loss = 0.0
         if val_loader:
             model.eval()
@@ -133,7 +132,7 @@ def main(args):
 
     print("--- Training Complete ---")
 
-    # 5. Save the final model
+    # 5. Save the final model checkpoint
     os.makedirs(os.path.dirname(args.model_save_path), exist_ok=True)
     checkpoint = {
         'model_state_dict': model.state_dict(),
@@ -144,9 +143,34 @@ def main(args):
         'final_train_loss': train_losses[-1],
         'final_val_loss': val_losses[-1] if val_losses else 0
     }
-
     torch.save(checkpoint, args.model_save_path)
     print(f"Model checkpoint saved successfully to: {args.model_save_path}")
+
+    # 6. Generate and save the final latent space if a path is provided
+    if args.latent_save_path:
+        print("\n--- Generating and Saving Latent Space ---")
+        model.eval() # Ensure model is in evaluation mode
+
+        # Load the full, original dataset directly for efficiency
+        print(f"Loading full dataset from {args.tensor_file} for final embedding...")
+        full_data_bundle = torch.load(args.tensor_file, map_location=device)
+        counts_tensor = full_data_bundle['counts']
+        timepoints_tensor = full_data_bundle['timepoints']
+
+        # Run inference on the entire dataset to get the latent representations
+        with torch.no_grad():
+            _, latent_reps_tensor = model(counts_tensor)
+
+        # Create a dictionary to save
+        latent_space_data = {
+            'latent_reps': latent_reps_tensor.cpu(), # Save on CPU to make file more portable
+            'timepoints': timepoints_tensor.cpu()
+        }
+
+        # Save the latent space data to the specified file
+        os.makedirs(os.path.dirname(args.latent_save_path), exist_ok=True)
+        torch.save(latent_space_data, args.latent_save_path)
+        print(f"Latent space saved successfully to: {args.latent_save_path}")
 
 
 if __name__ == '__main__':

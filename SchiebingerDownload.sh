@@ -13,6 +13,10 @@ DATA_URL="https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE122662&format=file"
 # The directory where the data will be stored.
 # This creates a 'data' folder in the current directory.
 OUTPUT_DIR="Data/Schiebinger"
+ARCHIVE_FILE="${OUTPUT_DIR}/Schiebinger.tar"
+
+# --- NEW: Flag to track if a download occurred ---
+DOWNLOAD_PERFORMED=0
 
 # --- Main Logic ---
 
@@ -28,12 +32,14 @@ else
 
     # Use wget to download the file. The -c flag allows resuming an interrupted download.
     echo "Downloading dataset from ${DATA_URL}..."
-    wget -c -O "${OUTPUT_DIR}/Schiebinger.tar" "${DATA_URL}"
+    wget -c -O "${ARCHIVE_FILE}" "${DATA_URL}"
+    
+    # --- NEW: Set the flag because a download just happened ---
+    DOWNLOAD_PERFORMED=1
 fi
 
 
 # Unpack any tar files found in the output directory
-
 for tarfile in "${OUTPUT_DIR}"/*.tar "${OUTPUT_DIR}"/*.tar.gz "${OUTPUT_DIR}"/*.tgz; do
     if [ -f "$tarfile" ]; then
         echo "Unpacking $tarfile..."
@@ -46,9 +52,16 @@ for tarfile in "${OUTPUT_DIR}"/*.tar "${OUTPUT_DIR}"/*.tar.gz "${OUTPUT_DIR}"/*.
 done
 
 
-# Clean up the downloaded zip file
-# echo "Cleaning up..."
-# rm "${OUTPUT_DIR}/.tar"
+# --- NEW: Conditional Cleanup Logic ---
+# Check the flag. Only run cleanup if the DOWNLOAD_PERFORMED flag is 1.
+if [ "$DOWNLOAD_PERFORMED" -eq 1 ]; then
+    echo "Cleaning up downloaded archive..."
+    rm "${ARCHIVE_FILE}"
+else
+    echo "Skipping cleanup as no new download was performed."
+fi
+
 
 echo "---"
-echo "Dataset is located in: $Data/${OUTPUT_DIR}"
+# Corrected the path in the final output message
+echo "Dataset is located in: ${OUTPUT_DIR}"
