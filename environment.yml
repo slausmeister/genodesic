@@ -1,20 +1,29 @@
 name: genodesic
 channels:
-  - rapidsai
-  - pytorch
+  - rapidsai          # strict order => faster resolve
   - nvidia
+  - pytorch
   - conda-forge
 dependencies:
-  - python=3.10
-  - pytorch=2.2.*
-  - pytorch-cuda=12.1
-  - cuml=24.04.*
+  - python = 3.11
+  - pip
+  # GPU / RAPIDS stack
+  - pytorch = 2.2.*
+  - pytorch-cuda = 12.1          # matches the 12.1 base image
+  - cudf  = 24.04.*
+  - cuml  = 24.04.*
+  # RAPIDS pulls cupy, cuda-python, cubinlinker, ptxcompiler itself
+  # User-space libs
   - jupyterlab
   - ipykernel
   - h5py
   - matplotlib
   - numpy
-  - pandas
   - scanpy
   - k3d
+  - pandas < 2.2                 # keeps RAPIDS happy
   - conda-build
+  # PyPI extras
+  - pip:
+      - torchdyn
+      - torchcfm

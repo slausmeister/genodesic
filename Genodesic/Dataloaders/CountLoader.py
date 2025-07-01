@@ -142,13 +142,12 @@ if __name__ == '__main__':
     for i, batch in enumerate(train_loader):
         batch_data, pseudo_time = batch
         print(f"Batch {i+1}:")
-        print(f"  Data shape: {batch_data.shape}")      # Expected: [32, 2000]
-        print(f"  Time shape: {pseudo_time.shape}")      # Expected: [32, 1]
+        print(f"  Data shape: {batch_data.shape}")    
+        print(f"  Time shape: {pseudo_time.shape}")   
         print(f"  Data device: {batch_data.device}")
         if i == 1: # Stop after a couple of batches
             break
             
-    # --- Test Case 2: Create training and validation loaders ---
     print("\n--- TEST CASE 2: With validation split ---")
     train_loader_split, val_loader_split = create_count_dataloaders(
         data_file=DUMMY_DATA_FILE,

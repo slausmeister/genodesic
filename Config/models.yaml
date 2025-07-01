@@ -1,0 +1,21 @@
+# Configuration for a training run
+model_type: "vpsde" # Options: "vpsde", "cfm", "rqnsf"
+
+# Shared parameters
+dim: 16
+batch_size: 512
+num_epochs: 30
+learning_rate: 0.0001
+validation_split: 0.2 # Added this for the dataloader
+
+# Model-specific hyperparameters
+model_params:
+  otcfm:
+    hidden_dim: 2048
+  vpsde:
+    hidden_dim: 2048
+    num_layers: 6
+    beta_min: 0.0001
+    beta_max: 20
+  rqnsf:
+    # No extra params needed for the fixed architecture

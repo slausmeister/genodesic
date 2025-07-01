@@ -2,13 +2,35 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import Optional
-
-# Assuming 'BaseDensityModel' is a defined class you are importing from your project
-from OptimalCellFlow.base_class import BaseDensityModel 
+from .base_class import BaseDensityModel 
 from torchdyn.core import NeuralODE
 from torchcfm.utils import torch_wrapper
 from torch.cuda.amp import autocast
 
+
+class MLP(nn.Module):
+    def __init__(self, dim, out_dim=None, w=64, time_varying=False, d=None):
+        super().__init__()
+        print(f"Creating MLP with dim={dim}, out_dim={out_dim}, w={w}, time_varying={time_varying}")
+        self.time_varying = time_varying
+        if out_dim is None:
+            out_dim = dim
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(dim + (1 if time_varying else 0), w),
+            torch.nn.SELU(),
+            torch.nn.Linear(w, w),
+            torch.nn.SELU(),
+            torch.nn.Linear(w, w),
+            torch.nn.SELU(),
+            torch.nn.Linear(w, w),
+            torch.nn.SELU(),
+            torch.nn.Linear(w, w),
+            torch.nn.SELU(),
+            torch.nn.Linear(w, out_dim),
+        )
+
+    def forward(self, x):
+        return self.net(x)
 
 class OptimalFlowModel(BaseDensityModel):
     def __init__(self, model_path, dim=16, out_dim=None, w=512, d=8, time_varying=True, device=None):
