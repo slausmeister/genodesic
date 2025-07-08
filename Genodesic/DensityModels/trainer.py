@@ -48,7 +48,7 @@ def train_cfm_epoch(model, train_loader, val_loader, optimizer, device):
 # 2. RQ-NSF Training Epoch
 # ===================================================================== #
 
-def train_rqnsf_epoch(model, train_loader, val_loader, optimizer, device):
+def train_rqnsf_epoch(model, train_loader, val_loader, optimizer, device, dim: int):
     """
     Performs one epoch of training and validation for an RQ-NSF model.
     """
@@ -60,7 +60,7 @@ def train_rqnsf_epoch(model, train_loader, val_loader, optimizer, device):
         optimizer.zero_grad()
         
         z, log_jac = model(x1)
-        log_p_z = -0.5 * (z**2).sum(dim=1) - 0.5 * model.dim * np.log(2.0 * np.pi)
+        log_p_z = -0.5 * (z**2).sum(dim=1) - 0.5 * dim * np.log(2.0 * np.pi)
         loss = -(log_p_z + log_jac).mean()
 
         loss.backward()
@@ -74,7 +74,7 @@ def train_rqnsf_epoch(model, train_loader, val_loader, optimizer, device):
         for x1, _, _ in val_loader:
             x1 = x1.to(device)
             z, log_jac = model(x1)
-            log_p_z = -0.5 * (z**2).sum(dim=1) - 0.5 * model.dim * np.log(2.0 * np.pi)
+            log_p_z = -0.5 * (z**2).sum(dim=1) - 0.5 * dim * np.log(2.0 * np.pi)
             loss = -(log_p_z + log_jac).mean()
             val_losses.append(loss.item())
             

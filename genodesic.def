@@ -53,7 +53,8 @@ rm -rf /root/.cache/pip
     export PYTHONNOUSERSITE=1
 
 %runscript
-    exec /bin/bash --rcfile <(echo "source /opt/conda/bin/activate genodesic") "$@"
+    echo "source /opt/conda/bin/activate genodesic" > /tmp/genodesic_rc
+    exec /bin/bash --rcfile /tmp/genodesic_rc "$@"
 
 %help
     CUDA 12.1 • PyTorch 2.2 • RAPIDS 24.04

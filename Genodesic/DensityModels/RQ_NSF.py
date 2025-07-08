@@ -104,3 +104,24 @@ class RQNSFModel(BaseDensityModel, nn.Module):
         log_density = self.compute_log_density(x)
         score = torch.autograd.grad(log_density.sum(), x, create_graph=False)[0]
         return score
+    
+    @classmethod
+    def from_checkpoint(cls, checkpoint_path: str, device: str = "cuda"):
+        """Loads an RQNSFModel from a checkpoint."""
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        # Check if the checkpoint is for the correct model type (optional but good practice)
+        if checkpoint.get('model_type') != 'rqnsf':
+            raise ValueError(f"Checkpoint is for model type {checkpoint.get('model_type')}, not 'rqnsf'.")
+
+        params = checkpoint['hyperparameters']
+        
+        # Rebuild the underlying FrEIA model
+        network = build_rq_nsf_model(dim=params['dim'])
+        network.load_state_dict(checkpoint['model_state_dict'])
+        
+        # Create an instance of the final wrapper class
+        # `cls` here refers to RQNSFModel
+        final_model = cls(model=network, dim=params['dim'], device=device)
+        final_model.eval()
+        return final_model

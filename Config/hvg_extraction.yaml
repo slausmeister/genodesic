@@ -1,0 +1,13 @@
+hvg_extraction:
+  # --- I/O ---
+  output_dir: "Pipeline/HVGs"
+  output_file: null # To be overwirtten by the script
+
+  # --- Data Source & Filtering ---
+  trunk: "both" # Options: "serum", "2i", or "both"
+  min_counts: 2000
+  max_counts: 50000
+  min_cells: 50
+
+  # --- HVG Selection ---
+  n_hvg: 2000

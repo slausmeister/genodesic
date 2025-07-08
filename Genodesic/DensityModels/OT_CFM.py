@@ -33,40 +33,12 @@ class MLP(nn.Module):
         return self.net(x)
 
 class OptimalFlowModel(BaseDensityModel):
-    def __init__(self, model_path, dim=16, out_dim=None, w=512, d=8, time_varying=True, device=None):
-        """
-        Initializes the Optimal Flow Model.
-        
-        The MLP architecture is now defined directly inside this class.
-        """
-        super().__init__() # Assuming the base class has an __init__
+    def __init__(self, dim=16, w=512, time_varying=True, device=None):
+        super().__init__()
         self.dim = dim
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # --- MLP architecture integrated directly ---
-        if out_dim is None:
-            out_dim = dim
-            
-        # The 'd' parameter was passed but not used in the original MLP architecture
-        print(f"Creating integrated MLP model with dim={dim}, out_dim={out_dim}, w={w}, time_varying={time_varying}")
-        
-        self.model = torch.nn.Sequential(
-            torch.nn.Linear(dim + (1 if time_varying else 0), w),
-            torch.nn.SELU(),
-            torch.nn.Linear(w, w),
-            torch.nn.SELU(),
-            torch.nn.Linear(w, w),
-            torch.nn.SELU(),
-            torch.nn.Linear(w, w),
-            torch.nn.SELU(),
-            torch.nn.Linear(w, w),
-            torch.nn.SELU(),
-            torch.nn.Linear(w, out_dim),
-        ).to(self.device)
-        # --- End of integrated MLP ---
-
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-        self.model.eval()
+        self.model = MLP(dim=dim, w=w, time_varying=time_varying).to(self.device)
         
         self.node = NeuralODE(
             torch_wrapper(self.model),
@@ -75,6 +47,28 @@ class OptimalFlowModel(BaseDensityModel):
             atol=1e-4,
             rtol=1e-4
         )
+
+    @classmethod
+    def from_checkpoint(cls, checkpoint_path: str, device: str = "cuda"):
+        """Loads an OptimalFlowModel from a checkpoint."""
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        
+        if checkpoint.get('model_type') != 'otcfm':
+            raise ValueError("Checkpoint is not for an 'otcfm' model.")
+
+        params = checkpoint['hyperparameters']
+        
+        # Instantiate the model shell
+        final_model = cls(
+            dim=params['dim'],
+            w=params['hidden_dim'], 
+            device=device
+        )
+        
+        # Load the state dict into the model
+        final_model.model.load_state_dict(checkpoint['model_state_dict'])
+        final_model.model.eval()
+        return final_model
     
     @torch.no_grad()
     def generate_samples(self, num_samples: Optional[int] = None, base_samples: Optional[torch.Tensor] = None, steps: int = 100):

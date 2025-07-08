@@ -9,25 +9,32 @@ from tqdm import tqdm
 import torch
 import warnings
 import matplotlib.pyplot as plt
+from typing import Dict, Any
+from Genodesic.Utils.config_loader import load_config
 
 # ===================================================================== #
 # 1. Command-Line Interface Definition
 # ===================================================================== #
 def setup_arg_parser():
     """
-    Sets up the command-line argument parser. This is not used by the notebook.
+    Sets up the command-line argument parser.
     """
     parser = argparse.ArgumentParser(
         description="Load, combine, and process Schiebinger dataset from 10x H5 files."
     )
-    parser.add_argument("--data_dir", default="../Data/Schiebinger/", help="Directory containing the raw .h5 files.")
-    parser.add_argument("--output_dir", default="./HVGs/", help="Directory where the final .pt file will be saved.")
-    parser.add_argument("--output_file", default=None, help="Name for the output .pt file. If None, a name is generated.")
-    parser.add_argument("--trunk", type=str, default="2i", choices=["serum", "2i", "both"], help="Specify the developmental trunk to analyze.")
-    parser.add_argument("--n_hvg", type=int, default=2000, help="Number of highly variable genes to select.")
-    parser.add_argument("--min_counts", type=int, default=50, help="Minimum number of genes expressed required for a cell to be kept.")
-    parser.add_argument("--max_counts", type=int, default=5000, help="Maximum number of genes expressed required for a cell to be kept.")
-    parser.add_argument("--min_cells", type=int, default=3, help="Minimum number of cells a gene must be expressed in to be kept.")
+    # --- Required inputs ---
+    parser.add_argument("--data_dir", required=True, help="Directory containing the raw .h5 files.")
+    
+    # --- Optional I/O (will override YAML if provided) ---
+    parser.add_argument("--output_dir", default=None, help="Directory where the final .pt file will be saved. Overrides YAML.")
+    parser.add_argument("--output_file", default=None, help="Name for the output .pt file. Overrides YAML.")
+    
+    # --- Optional Parameters (will override YAML if provided) ---
+    parser.add_argument("--trunk", type=str, default=None, choices=["serum", "2i", "both"], help="Specify the developmental trunk. Overrides YAML.")
+    parser.add_argument("--n_hvg", type=int, default=None, help="Number of highly variable genes. Overrides YAML.")
+    parser.add_argument("--min_counts", type=int, default=None, help="Min genes expressed for a cell. Overrides YAML.")
+    parser.add_argument("--max_counts", type=int, default=None, help="Max genes expressed for a cell. Overrides YAML.")
+    parser.add_argument("--min_cells", type=int, default=None, help="Min cells a gene must be in. Overrides YAML.")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode for more detailed logs and diagnostic plots.")
     return parser
 
@@ -82,21 +89,24 @@ def save_final_tensors(final_df, output_dir, output_file, trunk, n_hvg):
 # ===================================================================== #
 # 3. Core Logic Function 
 # ===================================================================== #
-def run_hvg_extraction(
-    data_dir,
-    output_dir,
-    output_file,
-    trunk,
-    n_hvg,
-    min_counts=50,
-    max_counts=5000,
-    min_cells=3,
-    debug=True
-):
+def run_hvg_extraction(config: Dict[str, Any], data_dir: str, debug: bool = True):
     """
-    Loads raw 10x data, performs QC, filtering, and HVG selection, and saves
-    the final count matrix and metadata as a PyTorch tensor file.
+    Loads raw 10x data, performs QC, filtering, and HVG selection based
+    on a provided configuration dictionary.
     """
+    # Pull all parameters from the config object
+    cfg = config['hvg_extraction']
+    output_dir = cfg['output_dir']
+    output_file = cfg['output_file']
+    trunk = cfg['trunk']
+    n_hvg = cfg['n_hvg']
+    min_counts = cfg['min_counts']
+    max_counts = cfg['max_counts']
+    min_cells = cfg['min_cells']
+
+    # Defensive check: ensure the output filename is specified
+    if not output_file:
+        raise ValueError("Configuration must specify 'hvg_extraction.output_file'")
 
     fig_to_return = None
     # 1. Discover H5 files and prepare for loading
@@ -230,9 +240,7 @@ def run_hvg_extraction(
     # 7. Save the final data to disk
     save_final_tensors(final_df, output_dir, output_file, trunk, n_hvg)
     print("\n--- Processing Complete ---")
-
-    return fig_to_return
-
+    return fig_to_return 
 
 # ===================================================================== #
 # 4. Command-Line Execution Wrapper
@@ -240,22 +248,38 @@ def run_hvg_extraction(
 def main():
     """
     Parses CLI arguments and launches the HVG extraction.
-    This is the sole entry point for command-line execution.
     """
     parser = setup_arg_parser()
     args = parser.parse_args()
-    
+
+    # 1. Prepare overrides from CLI arguments in the correct nested structure
+    overrides = {
+        "hvg_extraction": {
+            "output_dir": args.output_dir,
+            "output_file": args.output_file,
+            "trunk": args.trunk,
+            "n_hvg": args.n_hvg,
+            "min_counts": args.min_counts,
+            "max_counts": args.max_counts,
+            "min_cells": args.min_cells,
+        }
+    }
+    # Filter out None values so they don't overwrite defaults
+    overrides['hvg_extraction'] = {k: v for k, v in overrides['hvg_extraction'].items() if v is not None}
+
+    # 2. Load the base config and merge with CLI overrides
+    final_config = load_config(
+        default_config_path="Config/hvg_extraction.yaml",
+        overrides=overrides
+    )
+
+    # 3. Call the core worker function
     run_hvg_extraction(
+        config=final_config,
         data_dir=args.data_dir,
-        output_dir=args.output_dir,
-        output_file=args.output_file,
-        trunk=args.trunk,
-        n_hvg=args.n_hvg,
-        min_counts=args.min_counts,
-        max_counts=args.max_counts,
-        min_cells=args.min_cells,
         debug=args.debug
     )
 
 if __name__ == "__main__":
     main()
+

@@ -27,3 +27,12 @@ class BaseDensityModel(ABC, torch.nn.Module):
     def reverse(self, batch: Tensor, **kwargs) -> Tensor | None:
         """Map data → base space if the model supports an inverse transform."""
         raise NotImplementedError
+    
+    @classmethod
+    @abstractmethod
+    def from_checkpoint(cls, checkpoint_path: str, device: str = "cuda"):
+        """
+        Abstract class method to load a model from a checkpoint file.
+        Each subclass must implement this.
+        """
+        raise NotImplementedError

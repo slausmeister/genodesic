@@ -17,7 +17,7 @@ class SchiebingerCountDataset(Dataset):
         print(f"Loading data from: {data_file_path}")
         
         # Load the entire data bundle from the single file
-        data_bundle = torch.load(data_file_path, map_location=device)
+        data_bundle = torch.load(data_file_path, map_location=device, weights_only=False)
         
         # Extract the required tensors
         self.counts = data_bundle['counts']

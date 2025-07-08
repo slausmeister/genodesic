@@ -1,0 +1,18 @@
+autoencoder:
+  # --- I/O and File Paths ---
+  # These are placeholders; they MUST be overridden by the calling script
+  # or notebook for any specific run.
+  model_save_path: null
+  latent_save_path: null
+
+  # --- Model Architecture ---
+  intermediate_dims: [660, 220, 66]
+  bottleneck_dim: 24
+  variational: false
+
+  # --- Training Hyperparameters ---
+  num_epochs: 30
+  batch_size: 64
+  learning_rate: 0.0005
+  validation_split: 0.2
+  overdispersion: 0.3

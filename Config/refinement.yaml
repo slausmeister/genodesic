@@ -1,0 +1,18 @@
+refinement:
+  device:          cuda         
+  # ---- interpolation -------------------------------------------------
+  INTERPOLATION_POINTS: 200
+  INTERPOLATION_BETA:   0.5
+  # ---- relaxation loop ----------------------------------------------
+  RELAX_ITERATIONS: 50
+  RELAX_BETA:  0.333
+  RELAX_GAMMA: 0.3
+  RELAX_ALPHA: 0.05
+  NOISE_START: 0.1
+  NOISE_END:   0.0
+  RESAMPLE_EVERY: 50          
+  # ---- density resampling details -----------------------------------
+  decluster:            true   
+  pruning_threshold:    1e-3
+  samples_per_segment:  3
+  eps:                  1e-9
