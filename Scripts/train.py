@@ -37,23 +37,38 @@ def run_training(config: dict):
     os.makedirs(os.path.dirname(config["model_save_path"]), exist_ok=True)
 
     print("INFO: Setting up dataloaders...")
+    batch_size = model_specific_params.get("batch_size", config["batch_size"])
+    print(f"INFO: Using effective batch size of {batch_size}")
     train_loader, val_loader = create_latent_meta_dataloader(
         data_file=config["data_file"],
-        batch_size=config["batch_size"],
+        batch_size=batch_size,
         validation_split=config.get("validation_split", 0.2)
     )
 
     print(f"INFO: Initializing base network...")
     if model_type == "otcfm":
-        network = MLP(dim=config["dim"], w=model_specific_params["hidden_dim"], time_varying=True).to(device)
+        network = MLP(
+            dim=config["dim"], 
+            w=model_specific_params["hidden_dim"], 
+            time_varying=True, 
+            activation=model_specific_params.get("activation", "selu"),
+            num_layers=model_specific_params.get("num_layers", 4)
+        ).to(device)
     elif model_type == "vpsde":
         network = TimeScoreNet(
             input_dim=config["dim"],
             hidden_dim=model_specific_params["hidden_dim"],
-            num_layers=model_specific_params["num_layers"]
+            num_layers=model_specific_params["num_layers"],
+            activation=model_specific_params.get("activation", "selu")
         ).to(device)
     elif model_type == "rqnsf":
-        network = build_rq_nsf_model(dim=config["dim"]).to(device)
+        network = build_rq_nsf_model(
+            dim=config["dim"],
+            n_blocks=model_specific_params["n_blocks"],
+            bins=model_specific_params["bins"],
+            subnet_width=model_specific_params["subnet_width"],
+            subnet_activation=model_specific_params.get("subnet_activation", "selu")
+        ).to(device)
     else:
         raise ValueError(f"Unknown model_type in config: '{model_type}'")
 
@@ -88,21 +103,22 @@ def run_training(config: dict):
 
     network.eval()
     if model_type == "otcfm":
-        # Re-create the final model and load the trained weights into it
-        final_model = OptimalFlowModel(dim=config["dim"], w=model_specific_params["hidden_dim"], device=device)
-        final_model.model.load_state_dict(network.state_dict())
+        final_model = OptimalFlowModel(model=network, dim=config["dim"], device=device)
     elif model_type == "vpsde":
-        # Pass the trained network to the wrapper's constructor
+        sde_wrapper_params = {
+            key: model_specific_params[key] 
+            for key in ["beta_min", "beta_max"] 
+            if key in model_specific_params
+        }
         final_model = ScoreSDEModel(
-            time_score_model=network,
-            dim=config['dim'],
-            beta_min=model_specific_params["beta_min"],
-            beta_max=model_specific_params["beta_max"],
-            device=device
+            time_score_model=network, 
+            dim=config['dim'], 
+            device=device, 
+            **sde_wrapper_params  
         )
     elif model_type == "rqnsf":
-        # Pass the trained network to the wrapper's constructor
         final_model = RQNSFModel(model=network, dim=config['dim'], device=device)
+
 
     return final_model
 

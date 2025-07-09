@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import torch
 from torch import Tensor
+import torch.nn as nn
 
 class BaseDensityModel(ABC, torch.nn.Module):
     """
@@ -36,3 +37,10 @@ class BaseDensityModel(ABC, torch.nn.Module):
         Each subclass must implement this.
         """
         raise NotImplementedError
+
+
+# Utility function to get activation function by name
+def _get_activation(name: str) -> nn.Module:
+    if name.lower() == "selu": return nn.SELU()
+    elif name.lower() == "relu": return nn.ReLU()
+    else: raise ValueError(f"Unknown activation: {name}")

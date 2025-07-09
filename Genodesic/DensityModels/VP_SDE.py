@@ -3,11 +3,11 @@ import torch.nn as nn
 import numpy as np
 from typing import Optional, Callable
 from tqdm import tqdm
-from .base_class import BaseDensityModel
+from .base_class import BaseDensityModel, _get_activation
 
 
 class TimeScoreNet(nn.Module):
-    def __init__(self, input_dim=16, hidden_dim=512, num_layers=8):
+    def __init__(self, input_dim=16, hidden_dim=512, num_layers=8, activation="selu"):
         super().__init__()
         # --- Corrected nn.Module classes ---
         self.input_layer = nn.Linear(input_dim + 1, hidden_dim)
@@ -18,7 +18,7 @@ class TimeScoreNet(nn.Module):
         ])
         
         self.activations = nn.ModuleList([
-            nn.SELU() for _ in range(num_layers)
+            _get_activation(activation) for _ in range(num_layers)
         ])
 
     def forward(self, x, t):
@@ -43,7 +43,6 @@ class ScoreSDEModel(BaseDensityModel):
         dim: int = 16, 
         steps: int = 250, 
         device: Optional[torch.device] = None, 
-        # --- Corrected Type Hints ---
         beta_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         beta_min: Optional[float] = None,
         beta_max: Optional[float] = None
@@ -102,11 +101,11 @@ class ScoreSDEModel(BaseDensityModel):
             raise ValueError("Checkpoint is not for a 'vpsde' model.")
 
         params = checkpoint['hyperparameters']
-        # --- Corrected Class Name ---
         network = TimeScoreNet(
             input_dim=params['dim'],
             hidden_dim=params['hidden_dim'],
-            num_layers=params['num_layers']
+            num_layers=params['num_layers'],
+            activation=params.get('activation', 'selu')
         )
         network.load_state_dict(checkpoint['model_state_dict'])
         

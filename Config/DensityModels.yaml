@@ -12,10 +12,17 @@ validation_split: 0.2
 model_params:
   otcfm:
     hidden_dim: 2048
+    activation: "selu"
+    num_layers: 4
+    batch_size: 700
   vpsde:
     hidden_dim: 2048
     num_layers: 6
     beta_min: 0.0001
     beta_max: 20
+    activation: "selu"
   rqnsf:
-    # No extra params needed for the fixed architecture
+    n_blocks: 3
+    bins: 15
+    subnet_width: 512
+    subnet_activation: "selu"

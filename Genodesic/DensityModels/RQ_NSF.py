@@ -1,50 +1,45 @@
 import torch
 import torch.nn as nn
-from .base_class import BaseDensityModel
+from .base_class import BaseDensityModel, _get_activation
 import FrEIA.framework as Ff
 from FrEIA.modules import RationalQuadraticSpline
 from typing import Optional
 
 
-def subnet_fc(dims_in, dims_out):
+def subnet_fc(dims_in: int, dims_out: int, width: int = 512, activation: str = "selu"):
+    activation_fn = _get_activation(activation)
     return nn.Sequential(
-        nn.Linear(dims_in, 512),
-        nn.SELU(),
-        nn.Linear(512, 512),
-        nn.SELU(),
-        nn.Linear(512, 512),
-        nn.SELU(),
-        nn.Linear(512, dims_out)
+        nn.Linear(dims_in, width),
+        activation_fn,
+        nn.Linear(width, width),
+        activation_fn,
+        nn.Linear(width, width),
+        activation_fn,
+        nn.Linear(width, dims_out)
     )
 
-def build_rq_nsf_model(dim=13, n_blocks=3, bins=15):
+def build_rq_nsf_model(dim: int, n_blocks: int, bins: int, subnet_width: int, subnet_activation: str):
+    
+    # Create a lambda to pass parameters to the subnet constructor
+    subnet_constructor = lambda dims_in, dims_out: subnet_fc(
+        dims_in, dims_out, width=subnet_width, activation=subnet_activation
+    )
+    
     flow = Ff.SequenceINN(dim)
     for _ in range(n_blocks):
         flow.append(
             RationalQuadraticSpline,
-            subnet_constructor=subnet_fc,
+            subnet_constructor=subnet_constructor,
             bins=bins
         )
-
     return flow
 
-
-# --------------------------------------------
-# Drop-in RQ-NSF model to replace OptimalFlowModel
-# --------------------------------------------
 class RQNSFModel(BaseDensityModel, nn.Module):
-    def __init__(self, model: Optional[nn.Module] = None, dim=13, n_blocks=6, bins=8, device=None):
+    def __init__(self, model: nn.Module, dim: int, device: Optional[str] = None, **kwargs):
         super().__init__()
         self.dim = dim
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        if model is not None:
-            # Use the provided model
-            self.model = model.to(self.device)
-        else:
-            # Build a new flow model if not provided
-            self.model = build_rq_nsf_model(dim=dim, n_blocks=n_blocks, bins=bins).to(self.device)
-        
+        self.model = model.to(self.device)
         self.model.eval()
 
     def to(self, device):
@@ -110,18 +105,20 @@ class RQNSFModel(BaseDensityModel, nn.Module):
         """Loads an RQNSFModel from a checkpoint."""
         checkpoint = torch.load(checkpoint_path, map_location=device)
         
-        # Check if the checkpoint is for the correct model type (optional but good practice)
         if checkpoint.get('model_type') != 'rqnsf':
-            raise ValueError(f"Checkpoint is for model type {checkpoint.get('model_type')}, not 'rqnsf'.")
+            raise ValueError("Checkpoint is not for an 'rqnsf' model.")
 
         params = checkpoint['hyperparameters']
         
-        # Rebuild the underlying FrEIA model
-        network = build_rq_nsf_model(dim=params['dim'])
+        network = build_rq_nsf_model(
+            dim=params['dim'],
+            n_blocks=params['n_blocks'],
+            bins=params['bins'],
+            subnet_width=params['subnet_width'],
+            subnet_activation=params['subnet_activation']
+        )
         network.load_state_dict(checkpoint['model_state_dict'])
         
-        # Create an instance of the final wrapper class
-        # `cls` here refers to RQNSFModel
         final_model = cls(model=network, dim=params['dim'], device=device)
         final_model.eval()
         return final_model
