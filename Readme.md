@@ -34,7 +34,7 @@ This is the easiest and most reliable way to get started. The container encapsul
 Download the pre-built Singularity Image File (`genodesic.sif`) to your machine.
 ```bash
 # Placeholder for download command, e.g., using wget or scp
-wget <URL_TO_YOUR_SIF_FILE>/genodesic.sif
+wget stani-stein.com/containers/genodesic.sif
 ```
 
 ### 2. Install the Jupyter Kernel
