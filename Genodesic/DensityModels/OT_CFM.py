@@ -5,7 +5,6 @@ from typing import Optional
 from .base_class import BaseDensityModel, _get_activation
 from torchdyn.core import NeuralODE
 from torchcfm.utils import torch_wrapper
-from torch.cuda.amp import autocast
 
 
 class MLP(nn.Module):
@@ -94,134 +93,104 @@ class OptimalFlowModel(BaseDensityModel):
         return traj[-1]
     
     def compute_log_density(self, batch: torch.Tensor, num_div_estimates: int = 10, steps: int = 100) -> torch.Tensor:
-        """
-        Calculate per-sample log-density for a given batch of data with optimized memory management.
-        """
         batch = batch.to(self.device).requires_grad_(True)
         t_span = torch.linspace(0, 1, steps, device=self.device)
         traj = self.node.trajectory(batch, t_span=t_span)
 
-        # Compute log probability in the base space
         base_samples = traj[-1].detach()
         log_prob_base = (-0.5 * (base_samples**2).sum(dim=1)) - (
             0.5 * base_samples.size(1) * torch.log(torch.tensor(2 * torch.pi, device=self.device))
         )
-        del base_samples  # Remove base_samples to clear memory
+        del base_samples
         torch.cuda.empty_cache()
 
-        # Initialize log-determinant Jacobian
         log_det_jacobian = torch.zeros(batch.size(0), device=self.device)
 
-        # Hutchinson's Trace Estimator for divergence
         for t_idx in range(traj.shape[0] - 1):
             dt = t_span[t_idx + 1] - t_span[t_idx]
             t_input = t_span[t_idx].expand(batch.size(0), 1).to(self.device)
-
             traj_t = traj[t_idx].requires_grad_(True)
             input_with_time = torch.cat((traj_t, t_input), dim=1)
 
             divergence_estimate = 0
             for _ in range(num_div_estimates):
                 noise = torch.randn_like(traj_t, device=self.device)
-                with autocast():
+                with torch.autocast(device_type=self.device):
                     vec_field = self.model(input_with_time)
-
+                
                 grad_output = torch.autograd.grad(
-                    outputs=vec_field,
-                    inputs=traj_t,
-                    grad_outputs=noise,
-                    retain_graph=True,
-                    create_graph=False,
-                    allow_unused=True
+                    outputs=vec_field, inputs=traj_t, grad_outputs=noise,
+                    retain_graph=True, create_graph=False # FIX: create_graph is False
                 )[0]
 
                 if grad_output is not None:
                     divergence_estimate += (noise * grad_output).sum(dim=1)
-
-                # Clear per-iteration memory
+                
+                # FIX: Aggressive cleanup from prototype
                 del noise, vec_field, grad_output
                 torch.cuda.empty_cache()
 
-            log_det_jacobian += (divergence_estimate / num_div_estimates) * dt
+            log_det_jacobian -= (divergence_estimate / num_div_estimates) * dt # Note: it's -= for fwd ODE
 
-            # Clear per-iteration memory
             del traj_t, t_input, input_with_time, divergence_estimate
             torch.cuda.empty_cache()
-
-        # Final log density computation
+            
         log_density = log_prob_base + log_det_jacobian
-
-        # Cleanup large tensors
         del traj, log_prob_base, log_det_jacobian, t_span
         torch.cuda.empty_cache()
-
         return log_density
 
-    def compute_score(self, batch: torch.Tensor, num_div_estimates: int = 20, steps: int = 100) -> torch.Tensor:
+
+
+    def compute_score(self, batch: torch.Tensor, num_div_estimates: int = 10, steps: int = 100) -> torch.Tensor:
         """
-        Compute the score (gradient of log-density w.r.t data and time).
+        Compute the score (gradient of log-density w.r.t data).
+        This method is memory-intensive as it must build a graph for backpropagation.
         """
         batch = batch.to(self.device).requires_grad_(True)
-        
-        # We need to compute log_density with graph tracking enabled for this batch
-        # so we cannot use the decorated `compute_log_density` directly. 
-        # The logic is duplicated here with `requires_grad` flow.
-        
         t_span = torch.linspace(0, 1, steps, device=self.device)
-        # Note: torch.autograd.grad will need the graph from the trajectory computation
+        
         traj = self.node.trajectory(batch, t_span=t_span)
         
-        # Compute log probability in the base space
-        log_prob_base = (-0.5 * (traj[-1]**2).sum(dim=1)) - (
-            0.5 * traj[-1].size(1) * torch.log(torch.tensor(2 * torch.pi, device=self.device))
+        base_samples = traj[-1]
+        log_prob_base = (-0.5 * (base_samples**2).sum(dim=1)) - (
+            0.5 * base_samples.size(1) * torch.log(torch.tensor(2 * torch.pi, device=self.device))
         )
     
-        # Initialize log-determinant Jacobian
         log_det_jacobian = torch.zeros(batch.size(0), device=self.device)
     
-        # Hutchinson's Trace Estimator for divergence
         for t_idx in range(traj.shape[0] - 1):
             dt = t_span[t_idx + 1] - t_span[t_idx]
             t_input = t_span[t_idx].expand(batch.size(0), 1).to(self.device)
-    
-            traj_t = traj[t_idx]
-            # We need to re-enable grad for this intermediate tensor
-            traj_t.requires_grad_(True)
+            traj_t = traj[t_idx].requires_grad_(True)
             input_with_time = torch.cat((traj_t, t_input), dim=1)
     
             divergence_estimate = 0
             for _ in range(num_div_estimates):
                 noise = torch.randn_like(traj_t, device=self.device)
-
-                with torch.autocast():
+                with torch.autocast(device_type=self.device):
                     vec_field = self.model(input_with_time)
     
                 grad_output = torch.autograd.grad(
-                    outputs=vec_field,
-                    inputs=traj_t,
-                    grad_outputs=noise,
-                    retain_graph=True,
-                    create_graph=True, # Must be true to backprop through the divergence
-                    allow_unused=True
+                    outputs=vec_field, inputs=traj_t, grad_outputs=noise,
+                    retain_graph=True, create_graph=False, allow_unused=True
                 )[0]
     
                 if grad_output is not None:
                     divergence_estimate += (noise * grad_output).sum(dim=1)
             
-            log_det_jacobian = log_det_jacobian + (divergence_estimate / num_div_estimates) * dt
-    
-        # Combine log probability and Jacobian
+            log_det_jacobian -= (divergence_estimate / num_div_estimates) * dt
+
+            del dt, t_input, traj_t, input_with_time, divergence_estimate, noise, vec_field, grad_output
+            torch.cuda.empty_cache()
+
         log_density = log_prob_base + log_det_jacobian
-    
-        # Final gradient to get the score
+        
         score = torch.autograd.grad(
-            outputs=log_density.sum(), # Summing to get a scalar output for autograd
-            inputs=batch,
-            create_graph=False
+            outputs=log_density.sum(), inputs=batch, create_graph=False
         )[0]
     
-        # Final cleanup
-        del traj, log_prob_base, log_det_jacobian, log_density
+        del traj, base_samples, log_prob_base, log_det_jacobian, log_density
         torch.cuda.empty_cache()
     
         return score

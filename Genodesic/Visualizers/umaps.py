@@ -3,6 +3,7 @@ import numpy as np
 import k3d
 from matplotlib import cm
 from typing import Optional, List, Union
+import matplotlib.pyplot as plt
 
 # Attempt to import cuML UMAP, with a fallback to the standard UMAP
 try:
@@ -130,3 +131,87 @@ def UMAP3D(
     # --- 5. Display Plot ---
     print("--- Visualization Complete ---")
     return plot
+
+
+
+def UMAP2D(
+    latent_reps: np.ndarray,
+    paths: Optional[List[Union[torch.Tensor, np.ndarray]]] = None,
+    color_by_timepoints: Optional[np.ndarray] = None,
+    color_by_labels: Optional[np.ndarray] = None,
+    title: str = "Latent Space UMAP",
+    point_size: float = 5.0,
+    **umap_kwargs
+):
+    """
+    Computes and visualizes a 2D UMAP with Matplotlib.
+    Returns a single Figure object, acting as a drop-in replacement for UMAP3D.
+    """
+    print("--- Starting 2D Visualization ---")
+
+    # --- 1. UMAP Fitting ---
+    print("Fitting UMAP model...")
+    umap_kwargs['n_components'] = 2
+    if 'random_state' not in umap_kwargs:
+        umap_kwargs['random_state'] = 42
+    if 'ax' in umap_kwargs:
+        umap_kwargs.pop('ax')
+    if HAS_CUML:
+        umap_model = cumlUMAP(**umap_kwargs)
+    else:
+        umap_model = umap.UMAP(**umap_kwargs)
+    embedding = umap_model.fit_transform(latent_reps)
+
+    # --- 2. Plotting Setup ---
+    print("Creating matplotlib plot...")
+    fig, ax = plt.subplots(figsize=(12, 10))
+    
+    # --- 3. Color & Attribute Handling ---
+    scatter_kwargs = {'s': point_size, 'alpha': 0.7, 'edgecolor': 'none'}
+    if color_by_labels is not None:
+        unique_labels = np.unique(color_by_labels)
+        cmap = cm.get_cmap('hsv', len(unique_labels))
+        for i, label in enumerate(unique_labels):
+            idx = (color_by_labels == label)
+            ax.scatter(embedding[idx, 0], embedding[idx, 1], color=cmap(i), label=str(label), **scatter_kwargs)
+        ax.legend(title="Labels")
+    elif color_by_timepoints is not None:
+        scatter = ax.scatter(embedding[:, 0], embedding[:, 1], c=color_by_timepoints, cmap='viridis', **scatter_kwargs)
+        cbar = fig.colorbar(scatter, ax=ax)
+        cbar.set_label('Timepoints')
+    else:
+        ax.scatter(embedding[:, 0], embedding[:, 1], c='gray', **scatter_kwargs)
+
+    # --- 4. Path Plotting (Restored Logic) ---
+    if paths:
+        print(f"Transforming and plotting {len(paths)} paths...")
+        path_colors = plt.get_cmap('tab10').colors
+
+        def unpack_and_convert(item):
+            if isinstance(item, torch.Tensor): return item.detach().cpu().numpy()
+            if isinstance(item, (list, tuple)): return np.concatenate([unpack_and_convert(sub_item) for sub_item in item], axis=0)
+            return np.asarray(item)
+
+        for i, path in enumerate(paths):
+            path_np = unpack_and_convert(path).astype(np.float32)
+            if path_np.shape[1] != latent_reps.shape[1]:
+                raise ValueError(f"Path {i} has D={path_np.shape[1]}, but latent space has D={latent_reps.shape[1]}")
+            
+            path_emb = umap_model.transform(path_np)
+            color = path_colors[i % len(path_colors)]
+            
+            ax.plot(path_emb[:, 0], path_emb[:, 1], color=color, linewidth=2.5, label=f'Path {i+1}', zorder=10)
+            ax.scatter(path_emb[:, 0], path_emb[:, 1], color=color, s=point_size*10, edgecolor='black', zorder=11)
+        
+        ax.legend()
+
+    # --- 5. Final Adjustments ---
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel("UMAP 1")
+    ax.set_ylabel("UMAP 2")
+    ax.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.close(fig)
+
+    print("--- Visualization Complete ---")
+    return fig

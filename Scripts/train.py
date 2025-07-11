@@ -6,9 +6,9 @@ import os
 
 from Genodesic.Utils.config_loader import load_config
 from Genodesic.Dataloaders.LatentLoader import create_latent_meta_dataloader
+from Genodesic.Utils import load_density_model_from_checkpoint
 from Genodesic.DensityModels import (
     MLP, TimeScoreNet, build_rq_nsf_model,
-    OptimalFlowModel, ScoreSDEModel, RQNSFModel
 )
 from Genodesic.DensityModels.trainer import train_cfm_epoch, train_vpsde_epoch, train_rqnsf_epoch
 
@@ -92,36 +92,26 @@ def run_training(config: dict):
         scheduler.step(val_loss)
         print(f"Epoch {epoch+1:02d}/{config['num_epochs']} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
 
-    # Step 6: Save the checkpoint
+    # Step 6: Save the self-contained checkpoint
     print(f"INFO: Training complete. Saving checkpoint to {config['model_save_path']}")
+    hyperparams = {
+        'dim': config['dim'], 
+        **config['model_params'][config['model_type']]
+    }
     checkpoint = {
         'model_state_dict': network.state_dict(),
         'model_type': config['model_type'],
-        'hyperparameters': {'dim': config['dim'], **config['model_params'][config['model_type']]}
+        'hyperparameters': hyperparams
     }
     torch.save(checkpoint, config['model_save_path'])
 
-    network.eval()
-    if model_type == "otcfm":
-        final_model = OptimalFlowModel(model=network, dim=config["dim"], device=device)
-    elif model_type == "vpsde":
-        sde_wrapper_params = {
-            key: model_specific_params[key] 
-            for key in ["beta_min", "beta_max"] 
-            if key in model_specific_params
-        }
-        final_model = ScoreSDEModel(
-            time_score_model=network, 
-            dim=config['dim'], 
-            device=device, 
-            **sde_wrapper_params  
-        )
-    elif model_type == "rqnsf":
-        final_model = RQNSFModel(model=network, dim=config['dim'], device=device)
-
+    # Step 7: Load the model from the checkpoint to verify and return
+    final_model = load_density_model_from_checkpoint(
+        checkpoint_path=config['model_save_path'],
+        device=device
+    )
 
     return final_model
-
 
 def main_cli():
     """Handles command-line execution with our standard config pattern."""
