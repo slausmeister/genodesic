@@ -1,22 +1,18 @@
 # The Genodesic Package
+**A unified, score-based framework for trajectory inference in single-cell genomics.** 
+
+![Morph](Assets/morph.gif)
+
 This package implements the **Genodesic** as presented in my Master's Thesis "Genodesic: Trajectory Reconstruction in Single-Cell Sequencing Data using Score Based Methods" supervised by Simon Anders, Roland Herzog and Evelyn Herberg.
 
 The method is built upon the foundational work of [Sorrenson et al. (2024)](https://arxiv.org/abs/2407.09297), who proposed using a combination of a Normalizing Flow for density estimation and a separate score matching model to compute geodesics with a data-driven Fermat metric.
 
-The fundamental idea is that if distances are short where density is high, then geodesics  — the shortest path on a manifold under certain assumptions — go through areas supported by the data, as they will find shorter lengths there. Thus regression/trajectory inference turns into a geodesic calculation.
+The fundamental idea is that if distances are short where density is high, then geodesics  — the shortest path on a manifold under certain assumptions — go through areas supported by the data, as they will find shorter lengths there. Thus regression/trajectory inference turns into a geodesic calculation solved via relaxation (compare with the gif).
 
 The primary contribution of this thesis is to unify this framework. While the previous work identified inconsistencies when using separate models, **Genodesic** employs a single, score-based generative model (a Variance-Preserving Stochastic Differential Equation) to learn a smoother and more stable score function. The data density is then derived directly from this unified model, creating a cohesive approach that improves the numerical stability critical for robust trajectory inference.
 
 For the Geodesic equation to be numerically solvable we assume a continuous dataspace. As single-cell sequencing data is very high dimensional and integer based we also construct a latent-space based on a Negative-Binomial Autoencoder. 
 
-The package is structured as follows:
-
-- Dataloaders: Contains Dataloaders both for raw sequencing data as well as for the latentspace
-- DensityModels: Contains three different Score/Density models: A [VP-SDE diffusion](https://arxiv.org/abs/2011.13456) implementation, an [OT-CFM](https://arxiv.org/abs/2302.00482) based continuous normalizing flow, as well as a [Rational-Quadratic Neural Spline FLow](https://arxiv.org/abs/1906.04032)
-- LatentCell: The NB-Autoencoder
-- PathTools: The heart of the Geodesic based method including path initialization, path refinements as well as path evaluations
-- Utils: Utilities for loading/saving different models such that they are compatible with the rest of the package
-- Visualizers: Functions calculating different plots
 
 For a broad conceptual overview see [stani-stein.com/Genodesic](https://www.stani-stein.com/Genodesic).
 
@@ -127,9 +123,12 @@ pip install -e .
 
 ---
 
+
+
 # Genodesic Tutorial Notebook
 
-The central workflow is demonstrated by the [Genodesic_tutorial.ipynb](Genodesic_tutorial.ipynb). It demonstrates the main pipeline on the [Schiebinger Dataset](https://pubmed.ncbi.nlm.nih.gov/30712874/) from download though datapreperation, network training towards trajectory inference/evaluation.
+The central workflow is demonstrated in the **[Genodesic_tutorial.ipynb](Genodesic_tutorial.ipynb)**. This is the best place to start. It covers the end-to-end pipeline, from downloading the [Schiebinger dataset](https://pubmed.ncbi.nlm.nih.gov/30712874/) to inferring and evaluating a final trajectory.
+
 
 The pipeline from this tutorial notebook is implemented in subscripts that can also be run independently. They are located in the `Pipeline` directory.
 
@@ -139,8 +138,19 @@ The pipeline from this tutorial notebook is implemented in subscripts that can a
 - [Autoencoder Training:](Pipeline/secondTrainAutoencoder.py) A python script that both trains the NB-Autoencoder as well as creates the latent space that is to be used for downstream analysis
 - [Score/Density model training:](Pipeline/train.py) A python script that can train any of the implemented Score/Density models presented in my Master's thesis
 
-# Further Notebooks
-Additionally two notebooks that provide key evaluations of the models are included as well. Both notebooks assume that the tutorial notebook has already been run at least once/that the latent space has already been created and that the models have already been trained on it:
+## Key Analyses & Results
 
-- [Score Evaluation:](Score_stability_evaluation.ipynb) A notebook that evaluates the stability and computational speed of the generated score estimates
-- [Generative Evaluation:](Generative_evaluation.ipynb) A notebook that estimates the generative capabilities of the models as a stand in for density evaluation
+The main scientific claims and model evaluations are demonstrated in two supplementary notebooks. These notebooks assume the models have already been trained (e.g., by running the tutorial).
+
+- **[Score Evaluation](Score_stability_evaluation.ipynb):** This notebook demonstrates the superior numerical stability and computational performance of the score estimates generated by the unified VP-SDE model compared to the flow-based methods.
+
+- **[Generative Evaluation](Generative_evaluation.ipynb):** This notebook assesses the quality of the learned data distribution by comparing generated samples against the original data, showing that the model accurately captures the underlying data manifold.
+
+
+# Package Structure
+- Dataloaders: Contains Dataloaders both for raw sequencing data as well as for the latentspace
+- DensityModels: Contains three different Score/Density models: A [VP-SDE diffusion](https://arxiv.org/abs/2011.13456) implementation, an [OT-CFM](https://arxiv.org/abs/2302.00482) based continuous normalizing flow, as well as a [Rational-Quadratic Neural Spline FLow](https://arxiv.org/abs/1906.04032)
+- LatentCell: The NB-Autoencoder
+- PathTools: The heart of the Geodesic based method including path initialization, path refinements as well as path evaluations
+- Utils: Utilities for loading/saving different models such that they are compatible with the rest of the package
+- Visualizers: Functions calculating different plots
