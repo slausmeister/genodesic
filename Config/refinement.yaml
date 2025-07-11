@@ -8,7 +8,7 @@ refinement:
   RELAX_BETA:  0.333
   RELAX_GAMMA: 0.3
   RELAX_ALPHA: 0.05
-  NOISE_START: 0.1
+  NOISE_START: 0.05
   NOISE_END:   0.0
   RESAMPLE_EVERY: 50          
   # ---- density resampling details -----------------------------------

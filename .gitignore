@@ -1,6 +1,17 @@
-*.sif
-Data/*
-*.code-workspace
-*.h5
-*.pt
+# Python cache
+__pycache__/
 *.pyc
+
+# Large Data, Models, and Intermediates
+Data/
+Models/
+LatentSpace/
+Pipeline/HVGs/
+
+# Container Files
+*.sif
+
+# IDE and OS files
+.vscode/
+*.code-workspace
+.DS_Store
