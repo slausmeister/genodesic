@@ -63,6 +63,12 @@ SIF="/path/to/genodesic.sif"
 # TO THE FULL, ABSOLUTE PATH, LIKE THIS:
 SIF="/home/slausmeister/Genodesic/genodesic.sif"
 ```
+
+Finally, make the `run_kernel.sh` executable
+
+```bash
+chmod +x ~/.local/share/jupyter/kernels/apptainer-genodesic/run_kernel.sh
+```
     
 **c.** **Restart VS Code / Jupyter**
     
