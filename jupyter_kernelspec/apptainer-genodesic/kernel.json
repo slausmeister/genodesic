@@ -1,9 +1,8 @@
 {
- "argv": [
-  "~/.local/share/jupyter/kernels/apptainer-genodesic/run_kernel.sh",
-  "-f",
-  "{connection_file}"
- ],
- "display_name": "Genodesic Kernel",
- "language": "python"
+  "argv": [
+    "~/.local/share/jupyter/kernels/apptainer-genodesic/run_kernel.sh",
+    "{connection_file}"
+  ],
+  "display_name": "Genodesic Kernel",
+  "language": "python"
 }

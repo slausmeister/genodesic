@@ -44,7 +44,6 @@ To make the container accessible in VS Code or Jupyter, you need to install the 
 Copy the apptainer-genodesic directory from this repository to your local Jupyter kernels folder.
     
 ```bash
-# Assumes you are in the root of the cloned Genodesic repository
 cp -r jupyter_kernelspec/apptainer-genodesic ~/.local/share/jupyter/kernels/
 ```
     
@@ -53,17 +52,16 @@ cp -r jupyter_kernelspec/apptainer-genodesic ~/.local/share/jupyter/kernels/
 You must edit the `run_kernel.sh` script you just copied to provide the absolute path to your `genodesic.sif` file.
     
 ```bash
-# Open the file in your preferred editor
 nvim ~/.local/share/jupyter/kernels/apptainer-genodesic/run_kernel.sh
 ```
-Inside the file, change the `CONTAINER_PATH` variable:
+Inside the file, change the `SIF` variable:
     
 ```bash
 # CHANGE THIS LINE:
-CONTAINER_PATH="~/Genodesic/genodesic.sif"
+SIF="/path/to/genodesic.sif"
     
 # TO THE FULL, ABSOLUTE PATH, LIKE THIS:
-CONTAINER_PATH="/home/slausmeister/Genodesic/genodesic.sif"
+SIF="/home/slausmeister/Genodesic/genodesic.sif"
 ```
     
 **c.** **Restart VS Code / Jupyter**
