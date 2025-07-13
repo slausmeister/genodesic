@@ -25,18 +25,28 @@ This project relies on a specific software stack including **PyTorch**, the **NV
 > **NVIDIA Driver Prerequisite**
 > Both installation methods require a Linux system with an NVIDIA GPU and a compatible NVIDIA driver. The environment is built against **CUDA 12.1**, so it's recommended to have a driver version that supports it.
 
+
+
 ## Option 1: Using the Apptainer Container (Recommended)
 
 This is the easiest and most reliable way to get started. The container encapsulates the entire environment, guaranteeing that all package versions are correct.
 
-### 1. Download the Container
+### 1a). Download the Container
 
-Download the pre-built Singularity Image File (`genodesic.sif`) to your machine.
+Download the pre-built Singularity Image File (`genodesic.sif`) to your machine and place it in the root of the git directory.
 ```bash
 wget stani-stein.com/containers/genodesic.sif
 ```
 
-### 2. Install the Jupyter Kernel
+### 1b) Building the container from scratch
+
+Alternatively we can also build the container from scratch. For this simply run
+```bash
+singularity build genodesic.sif genodesic.def
+```
+This will leave us with the container needed for the project.
+
+## 2. Install the Jupyter Kernel
 To make the container accessible in VS Code or Jupyter, you need to install the provided kernel definition. This repository includes a `jupyter_kernelspec` directory containing the necessary files.
 
 **a.** **Copy the Kernel Directory**
@@ -82,7 +92,7 @@ If you need to run other commands or explore the environment interactively, you 
 apptainer shell --nv /path/to/your/genodesic.sif
 ```
 
-### Option 2: Manual Installation (Advanced)
+## Option 2: Manual Installation (Advanced)
 
 This method is for users who cannot use Apptainer or need to build the environment from scratch. This process is more complex and prone to errors. The steps below replicate the build process defined in the `genodesic.def` file.
 

@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Jupyter files
+.jupyter/
+
 # Large Data, Models, and Intermediates
 Data/
 Models/
